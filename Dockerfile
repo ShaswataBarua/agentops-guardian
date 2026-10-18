@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=user . .
 EXPOSE 7860
 # The free Space's disk is wiped on restart, so re-seed the demo history every start.
-CMD ["sh", "-c", "python seed_demo.py && uvicorn api:app --host 0.0.0.0 --port 7860"]
+CMD ["sh", "-c", "python seed_demo.py && uvicorn api:app --host 0.0.0.0 --port ${PORT:-7860}"]
