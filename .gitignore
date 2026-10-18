@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+build/
+dist/
+
+# Local database & secrets
+agentops.db
+*.sqlite3
+.env
+.env.local
+
+# Telemetry / local ports
+*.log
+.traces/
+phoenix/
+jaeger/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Packaging
+node_modules/
+.uv/
+uv.lock
+poetry.lock

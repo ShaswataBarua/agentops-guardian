@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentOps — trust ledger for AI agents</title>
+<style>
+:root{
+  --bg:#f1f4f8; --panel:#ffffff; --ink:#172230; --slate:#556577; --rule:#d7dee6; --focus:#1d5fa8;
+  --t0:#dbe5f0; --t1:#b4cce4; --t2:#76a3d1; --t3:#2d6cab;
+  --ok:#17703f; --ok-bg:#e3f4ea; --warn:#8a5300; --warn-bg:#fdf0d5; --bad:#a82a22; --bad-bg:#fbe4e1; --info:#1d5fa8; --info-bg:#e2edf8;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e151d; --panel:#151f2a; --ink:#e7edf4; --slate:#9aa8b8; --rule:#263444; --focus:#7db3ea;
+  --t0:#233446; --t1:#2d4e72; --t2:#3f77ab; --t3:#6aa7e0;
+  --ok:#6fd49a; --ok-bg:#12301f; --warn:#f0b955; --warn-bg:#352708; --bad:#ff8f86; --bad-bg:#3a1613; --info:#7db3ea; --info-bg:#112538;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.top{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:18px 24px 14px;border-bottom:1px solid var(--rule);background:var(--panel)}
+.top h1{font:600 22px/1 var(--serif);letter-spacing:.01em}
+.top p{color:var(--slate)}
+.live{margin-left:auto;font-size:13px;color:var(--slate)}
+.live.off{color:var(--bad)}
+.layout{display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:0;align-items:start}
+.rail{border-right:1px solid var(--rule);min-height:calc(100vh - 62px)}
+.block{padding:18px 24px;border-bottom:1px solid var(--rule);background:var(--panel)}
+.block h2{font:600 16px/1.2 var(--serif);margin-bottom:12px}
+.stage{min-width:0}
+.stage .block{background:transparent}
+.stage .block.card{background:var(--panel)}
+.hint{color:var(--slate);font-size:13px}
+.empty{color:var(--slate)}
+
+/* scenarios */
+.scn{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--rule);padding:10px 0;cursor:pointer}
+.scn:first-of-type{border-top:0}
+.scn b{display:block;font-weight:600}
+.scn span{display:block;color:var(--slate);font-size:13px}
+.scn:hover b{text-decoration:underline}
+.scn[disabled]{opacity:.55;cursor:not-allowed}
+details.custom{margin-top:10px;border-top:1px solid var(--rule);padding-top:10px}
+summary{cursor:pointer;font-weight:600}
+.form{display:grid;gap:8px;margin-top:10px}
+.form label{display:grid;gap:3px;font-size:13px;color:var(--slate)}
+.form input[type=text],.form input[type=number],.form select,.form textarea{width:100%;padding:6px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--bg);color:var(--ink)}
+.form .row{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.form .row label{display:flex;gap:6px;align-items:center;color:var(--ink)}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--panel);padding:6px 14px;border-radius:4px;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--ink)}
+.btn.good{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+@media (prefers-color-scheme:dark){.btn.good,.btn.danger{color:#0e151d}}
+
+/* agents + authority ribbon */
+.agent{padding:14px 0;border-top:1px solid var(--rule)}
+.agent:first-of-type{border-top:0;padding-top:0}
+.agent-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.agent-head b{font-weight:600}
+.score{font:600 40px/1 var(--serif);margin:6px 0 10px}
+.score small{font:400 14px var(--sans);color:var(--slate)}
+.ribbon{position:relative;display:flex;height:12px;margin:0 0 4px}
+.ribbon i{display:block;height:100%}
+.ribbon .s0{flex:30;background:var(--t0)} .ribbon .s1{flex:30;background:var(--t1)}
+.ribbon .s2{flex:20;background:var(--t2)} .ribbon .s3{flex:20;background:var(--t3)}
+.ribbon .marker{position:absolute;top:-5px;width:4px;height:22px;margin-left:-2px;background:var(--ink);border:1px solid var(--panel);transition:left .7s cubic-bezier(.2,.8,.2,1)}
+.tiers{display:flex;font-size:12px;color:var(--slate)}
+.tiers span{text-align:left;overflow:hidden;white-space:nowrap}
+.tiers .t0{flex:30}.tiers .t1{flex:30}.tiers .t2{flex:20}.tiers .t3{flex:20}
+.tiers .now{color:var(--ink);font-weight:700}
+.can{margin-top:8px;font-size:14px}
+.why{margin-top:4px;color:var(--slate);font-size:13px}
+@media (prefers-reduced-motion:reduce){.ribbon .marker{transition:none}}
+
+/* runs */
+.runs{display:grid;gap:0}
+.run{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;width:100%;background:none;border:0;border-top:1px solid var(--rule);padding:8px 6px;cursor:pointer}
+.run:first-child{border-top:0}
+.run:hover{background:var(--bg)}
+.run[aria-current=true]{background:var(--info-bg)}
+.run .name{font-weight:600}
+.run .sub{color:var(--slate);font-size:13px}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)} .chip.info{background:var(--info-bg);color:var(--info)}
+
+/* run detail */
+.dhead{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:baseline;justify-content:space-between}
+.dhead h2{margin:0}
+.banner{margin:14px 0;padding:12px 14px;border-left:5px solid var(--info);background:var(--info-bg)}
+.banner.warn{border-color:var(--warn);background:var(--warn-bg)} .banner.bad{border-color:var(--bad);background:var(--bad-bg)} .banner.ok{border-color:var(--ok);background:var(--ok-bg)}
+.banner b{display:block}
+.banner code,td code{font:12.5px var(--mono)}
+.banner .actions{display:flex;gap:8px;margin-top:10px}
+.meter{height:8px;background:var(--rule);border-radius:4px;overflow:hidden;margin:6px 0 4px}
+.meter i{display:block;height:100%;background:var(--info)}
+.meter.hot i{background:var(--bad)}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.tablewrap{overflow-x:auto}
+table{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--slate);border-bottom:1px solid var(--rule);padding:6px 8px 6px 0;white-space:nowrap}
+td{vertical-align:top;border-bottom:1px solid var(--rule);padding:6px 8px 6px 0}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.res{max-width:360px;overflow-wrap:anywhere}
+.hist{list-style:none;margin:8px 0 0;padding:0;font-size:14px}
+.hist li{display:grid;grid-template-columns:48px 1fr auto;gap:8px;padding:5px 0;border-top:1px solid var(--rule)}
+.hist .d.up{color:var(--ok);font-weight:700}.hist .d.down{color:var(--bad);font-weight:700}
+.hist .after{color:var(--slate)}
+h3{font:600 15px/1.2 var(--serif);margin:20px 0 4px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:4px;display:none;max-width:90vw}
+@media (max-width:900px){.layout{grid-template-columns:1fr}.rail{border-right:0;min-height:0}.block{padding:16px}.top{padding:14px 16px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>AgentOps</h1>
+  <p>AI agents earn autonomy. Every change to a score is explained.</p>
+  <span id="live" class="live" role="status">Connecting…</span>
+</header>
+
+<main class="layout">
+  <aside class="rail">
+    <section class="block" aria-labelledby="h-scn">
+      <h2 id="h-scn">Run a scenario</h2>
+      <div id="scenarios"></div>
+      <details class="custom">
+        <summary>Custom run and score reset</summary>
+        <div class="form">
+          <label>Agent script <select id="c-agent"></select></label>
+          <label>Agent name (owns the trust score) <input id="c-id" type="text" value="support-bot"></label>
+          <div class="row">
+            <label><input id="c-breaker" type="checkbox" checked> Circuit breaker</label>
+            <label><input id="c-shield" type="checkbox" checked> Injection shield</label>
+            <label><input id="c-semantic" type="checkbox" checked> Semantic loop rule</label>
+          </div>
+          <label>Budget per run (USD) <input id="c-budget" type="number" step="0.01" value="0.05"></label>
+          <label>Seconds between steps <input id="c-delay" type="number" step="0.1" value="0.5"></label>
+          <label>Task for the real Gemini agent (optional) <textarea id="c-task" rows="2" placeholder="Read emails 1 and 2 and handle what customers ask."></textarea></label>
+          <div><button class="btn" data-act="custom">Start run</button></div>
+          <label>Set this agent's trust score to <input id="c-score" type="number" min="0" max="100" value="50"></label>
+          <div><button class="btn ghost" data-act="setscore">Set score</button></div>
+        </div>
+      </details>
+    </section>
+    <section class="block" aria-labelledby="h-agents">
+      <h2 id="h-agents">Agents and what they may do alone</h2>
+      <div id="agents"><p class="empty">No agents yet. Run a scenario to create one.</p></div>
+    </section>
+  </aside>
+
+  <section class="stage">
+    <div class="block">
+      <h2>Runs</h2>
+      <div id="runs" class="runs"><p class="empty">No runs yet.</p></div>
+    </div>
+    <div class="block card" id="detail">
+      <p class="empty">Start a scenario on the left. Pick “Earn trust” first: it needs your approval, and you will see the score move.</p>
+    </div>
+  </section>
+</main>
+<div id="toast" role="alert"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd = (n, d = 4) => "$" + Number(n || 0).toFixed(d);
+
+const STATUS = {
+  starting:{t:"Starting",i:"…",c:"info"}, running:{t:"Running",i:"▶",c:"info"},
+  waiting_approval:{t:"Waiting for approval",i:"⏸",c:"warn"}, paused:{t:"Paused",i:"⏸",c:"warn"},
+  done:{t:"Finished",i:"✓",c:"ok"}, tripped:{t:"Stopped by breaker",i:"■",c:"bad"},
+  quarantined:{t:"Quarantined by shield",i:"⛔",c:"bad"}, killed:{t:"Killed by a human",i:"✕",c:"bad"},
+  error:{t:"Error",i:"!",c:"bad"}
+};
+const ACTIVE = new Set(["starting","running","paused","waiting_approval"]);
+const STEP_LABEL = {ok:"ok",approved:"approved",rejected:"rejected",quarantined:"blocked",error:"error"};
+const STEP_CLASS = {ok:"info",approved:"ok",rejected:"warn",quarantined:"bad",error:"bad"};
+
+const SCENARIOS = [
+  {title:"Earn trust", note:"A $20 refund needs a human at Tier 1. Approve it and watch the score rise.", body:{agent:"normal"}},
+  {title:"Runaway loop", note:"The same call again and again. The breaker stops it and the score drops.", body:{agent:"looper"}},
+  {title:"Reworded loop", note:"Same question in different words. The semantic rule catches it.", body:{agent:"paraphraser"}},
+  {title:"Reworded loop, semantic rule off", note:"For comparison: only the cost cap stops it, much later.", body:{agent:"paraphraser", semantic:false}},
+  {title:"Prompt-injection email", note:"An email orders a $5000 refund. The shield blocks it.", body:{agent:"inbox_bot"}},
+  {title:"Injection email, shield off", note:"Second layer: the tier policy holds the refund for approval.", body:{agent:"inbox_bot", shield:false}},
+  {title:"Real Gemini agent", note:"A real model uses the same tools and the same controls.", body:{agent:"gemini_support", task:"Customer message: 'My order 1006 arrived damaged and I would like a refund of $250.' Look up the order, issue the refund, and email e@example.com."}, needs:"gemini_support"},
+];
+
+let selected = null, policy = null, scripts = [], cache = {}, busy = false;
+
+async function api(path, method = "GET", body) {
+  const r = await fetch(path, {method, headers: body ? {"Content-Type":"application/json"} : {}, body: body ? JSON.stringify(body) : undefined});
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch (e) {} throw new Error(m); }
+  return r.json();
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 4500); }
+const agentId = () => ($("#c-id").value || "support-bot").trim();
+
+function can(tier) {
+  const t = policy.tiers.find((x) => x.tier === tier);
+  if (tier === 0) return "Needs approval for every action";
+  if (t.refund_limit_without_approval === 0) return "Lookups and emails alone; every refund needs approval";
+  return `Refunds up to $${t.refund_limit_without_approval} alone`;
+}
+
+function renderScenarios() {
+  const avail = Object.fromEntries(scripts.map((s) => [s.name, s.available]));
+  $("#scenarios").innerHTML = SCENARIOS.map((s, i) => {
+    const off = s.needs && !avail[s.needs];
+    return `<button class="scn" data-act="launch" data-i="${i}" ${off ? "disabled" : ""}><b>${esc(s.title)}</b><span>${esc(s.note)}${off ? " Needs GEMINI_API_KEY in .env." : ""}</span></button>`;
+  }).join("");
+  $("#c-agent").innerHTML = scripts.map((s) => `<option value="${esc(s.name)}" ${s.available ? "" : "disabled"}>${esc(s.name)} - ${esc(s.description)}</option>`).join("");
+}
+
+function ribbon(score, tier) {
+  const names = ["Probation","Junior","Trusted","Senior"];
+  return `<div class="ribbon" role="img" aria-label="Trust score ${score} of 100, tier ${tier}"><i class="s0"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><span class="marker" style="left:${score}%"></span></div>
+    <div class="tiers">${names.map((n, i) => `<span class="t${i} ${i === tier ? "now" : ""}" ${i === tier ? 'aria-current="true"' : ""}>${n}</span>`).join("")}</div>`;
+}
+
+function renderAgents(list) {
+  if (!list.length) { $("#agents").innerHTML = '<p class="empty">No agents yet. Run a scenario to create one.</p>'; return; }
+  $("#agents").innerHTML = list.map((a) => `<div class="agent">
+    <div class="agent-head"><b>${esc(a.agent_id)}</b><span class="hint">Tier ${a.tier} · ${esc(a.tier_name)}</span></div>
+    <div class="score">${a.score}<small> / 100</small></div>
+    ${ribbon(a.score, a.tier)}
+    <p class="can"><b>${esc(can(a.tier))}</b></p>
+    <p class="why">${esc(a.explanation)}</p></div>`).join("");
+}
+
+function renderRuns(list) {
+  if (!list.length) { $("#runs").innerHTML = '<p class="empty">No runs yet.</p>'; return; }
+  $("#runs").innerHTML = list.slice(0, 8).map((r) => {
+    const s = STATUS[r.status] || {t:r.status,i:"",c:"info"};
+    return `<button class="run" data-act="select" data-id="${esc(r.run_id)}" aria-current="${r.run_id === selected}">
+      <span class="chip ${s.c}">${s.i} ${esc(s.t)}</span>
+      <span><span class="name">${esc(r.agent)}</span> <span class="sub">${esc(r.agent_id)} · run ${esc(r.run_id)}</span></span>
+      <span class="sub">${usd(r.total_cost)}</span></button>`;
+  }).join("");
+}
+
+function banner(r, steps) {
+  const s = STATUS[r.status] || {t:r.status,i:"",c:"info"};
+  if (r.status === "waiting_approval" && r.pending) {
+    return `<div class="banner warn" role="status"><b>Approval needed: ${esc(r.pending.tool)}</b>
+      <code>${esc(JSON.stringify(r.pending.args))}</code><div>${esc(r.pending.why)}</div>
+      <div class="actions"><button class="btn good" data-act="approve">Approve</button><button class="btn danger" data-act="reject">Reject</button></div></div>`;
+  }
+  if (["tripped","quarantined","killed","error"].includes(r.status)) {
+    return `<div class="banner bad" role="status"><b>Why it stopped</b>${esc(r.reason || "")}</div>`;
+  }
+  if (r.status === "done") return `<div class="banner ok" role="status"><b>Finished after ${steps.length} step${steps.length === 1 ? "" : "s"}</b></div>`;
+  return `<div class="banner" role="status"><b>${esc(s.t)}</b></div>`;
+}
+
+function renderDetail(d, agent) {
+  const r = d.run, steps = d.steps, active = ACTIVE.has(r.status);
+  const pct = r.budget ? Math.min(100, (r.total_cost / r.budget) * 100) : 0;
+  const rows = steps.map((x) => `<tr><td class="num">${x.step_no}</td><td>${esc(x.tool)}</td>
+    <td><code>${esc(JSON.stringify(x.args))}</code></td><td class="res" title="${esc(x.result)}">${esc(String(x.result).slice(0, 140))}</td>
+    <td class="num">${x.tokens}</td><td><span class="chip ${STEP_CLASS[x.status] || "info"}">${esc(STEP_LABEL[x.status] || x.status)}</span></td></tr>`).join("");
+  const hist = agent ? agent.history.slice().reverse().slice(0, 8).map((h) => `<li><span class="d ${h.delta > 0 ? "up" : h.delta < 0 ? "down" : ""}">${h.delta > 0 ? "+" : ""}${h.delta}</span><span>${esc(h.reason)}</span><span class="after">now ${h.score_after}</span></li>`).join("") : "";
+  $("#detail-dyn").innerHTML = `
+    <div class="dhead"><h2>${esc(r.agent)} <span class="hint">run ${esc(r.run_id)} for ${esc(r.agent_id)}</span></h2>
+      <span class="chip ${(STATUS[r.status] || {}).c || "info"}">${(STATUS[r.status] || {}).i || ""} ${esc((STATUS[r.status] || {}).t || r.status)}</span></div>
+    ${banner(r, steps)}
+    <div><span class="hint">Cost ${usd(r.total_cost)} of ${usd(r.budget, 2)} budget · ${r.total_tokens} tokens · breaker ${r.breaker_on ? "on" : "off"}</span>
+      <div class="meter ${pct >= 100 ? "hot" : ""}" role="img" aria-label="${pct.toFixed(0)} percent of budget used"><i style="width:${pct}%"></i></div></div>
+    <div class="ctrl">
+      ${r.status === "paused" ? '<button class="btn ghost" data-act="resume">Resume</button>' : `<button class="btn ghost" data-act="pause" ${active ? "" : "disabled"}>Pause</button>`}
+      <button class="btn danger" data-act="kill" ${active ? "" : "disabled"}>Kill run</button></div>
+    <h3>Steps</h3>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Tool</th><th>Arguments</th><th>Result</th><th>Tokens</th><th>Outcome</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">No steps yet.</td></tr>'}</tbody></table></div>
+    <h3>Why ${esc(r.agent_id)} has this score</h3>
+    ${agent ? `<p class="hint">${esc(agent.explanation)}</p>` : ""}
+    <ul class="hist">${hist}</ul>`;
+}
+
+function ensureDetailShell() {
+  if ($("#detail-dyn")) return;
+  $("#detail").innerHTML = `<div id="detail-dyn"></div>
+    <details class="custom" id="intervene"><summary>Step in on this run</summary>
+      <div class="form">
+        <label>Edit the agent's memory (JSON) <textarea id="i-mem" rows="2">{"order_id": 2222}</textarea></label>
+        <div><button class="btn ghost" data-act="memory">Apply memory</button></div>
+        <label>Override the next tool call <select id="i-tool"><option>lookup_order</option><option>issue_refund</option><option>send_email</option><option>read_email</option><option>search_kb</option></select></label>
+        <label>Arguments (JSON) <textarea id="i-args" rows="2">{"order_id": 1006}</textarea></label>
+        <div><button class="btn ghost" data-act="override">Override next call</button></div>
+        <p class="hint">Memory edits change what agents that read memory do next (the looper reads order_id). An override replaces the next tool call once.</p>
+      </div></details>`;
+}
+
+async function refresh() {
+  if (busy) return; busy = true;
+  try {
+    if (!policy) policy = await api("/policy");
+    if (!scripts.length) { scripts = await api("/scripts"); renderScenarios(); }
+    const [runs, agents] = await Promise.all([api("/runs"), api("/agents")]);
+    if (!selected && runs.length) selected = runs[0].run_id;
+    let detail = null, agent = null;
+    if (selected) {
+      detail = await api("/runs/" + selected);
+      agent = await api("/agents/" + encodeURIComponent(detail.run.agent_id));
+    }
+    const sig = JSON.stringify([runs, agents, detail, agent, selected]);
+    if (sig !== cache.sig) {
+      cache.sig = sig;
+      renderAgents(agents); renderRuns(runs);
+      if (detail) { ensureDetailShell(); renderDetail(detail, agent); }
+    }
+    const live = $("#live"); live.textContent = "Live"; live.classList.remove("off");
+  } catch (e) {
+    const live = $("#live"); live.textContent = "Disconnected: " + e.message; live.classList.add("off");
+  } finally { busy = false; }
+}
+
+async function post(path, body, method = "POST") {
+  try { await api(path, method, body); } catch (e) { toast(e.message); }
+  refresh();
+}
+function json(id) { try { return JSON.parse($(id).value); } catch (e) { toast("That is not valid JSON."); return null; } }
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, run = selected && "/runs/" + selected;
+  if (act === "select") { selected = b.dataset.id; cache.sig = ""; refresh(); }
+  else if (act === "launch") {
+    const s = SCENARIOS[+b.dataset.i];
+    try { const r = await api("/runs", "POST", {agent_id: agentId(), delay: 0.5, ...s.body}); selected = r.run_id; cache.sig = ""; refresh(); }
+    catch (err) { toast(err.message); }
+  }
+  else if (act === "custom") {
+    const body = {agent: $("#c-agent").value, agent_id: agentId(), breaker: $("#c-breaker").checked, shield: $("#c-shield").checked,
+      semantic: $("#c-semantic").checked, budget: +$("#c-budget").value, delay: +$("#c-delay").value};
+    if ($("#c-task").value.trim()) body.task = $("#c-task").value.trim();
+    try { const r = await api("/runs", "POST", body); selected = r.run_id; cache.sig = ""; refresh(); } catch (err) { toast(err.message); }
+  }
+  else if (act === "setscore") post("/agents/" + encodeURIComponent(agentId()) + "/trust", {score: +$("#c-score").value});
+  else if (!run) return;
+  else if (["pause","resume","kill","approve","reject"].includes(act)) post(run + "/" + act);
+  else if (act === "memory") { const m = json("#i-mem"); if (m) post(run + "/memory", {memory: m}, "PATCH"); }
+  else if (act === "override") { const a = json("#i-args"); if (a) post(run + "/override", {tool: $("#i-tool").value, args: a}); }
+});
+
+refresh(); setInterval(refresh, 700);
+</script>
+</body>
+</html>
