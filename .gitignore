@@ -33,3 +33,10 @@ node_modules/
 .uv/
 uv.lock
 poetry.lock
+
+# Private prep docs (do not publish)
+PITCH.md
+VIVA.md
+SUBMISSION.md
+SUBMISSION_ANSWERS.md
+STATE.md
